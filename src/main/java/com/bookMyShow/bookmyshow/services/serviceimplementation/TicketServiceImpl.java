@@ -13,10 +13,12 @@ import com.bookMyShow.bookmyshow.repository.*;
 import com.bookMyShow.bookmyshow.services.SeatService;
 import com.bookMyShow.bookmyshow.services.TicketService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static com.bookMyShow.bookmyshow.Utilities.*;
@@ -30,7 +32,8 @@ public class TicketServiceImpl implements TicketService {
     private final ShowRepository showRepository;
     private final TheatreRepository theatreRepository;
     private final ScreenRepository screenRepository;
-    private final MovieElasticRepository movieElasticRepository;
+    @Autowired(required = false)
+    private MovieElasticRepository movieElasticRepository;
 
     private final PaymentProviderFactory paymentProviderFactory;
 
@@ -59,15 +62,17 @@ public class TicketServiceImpl implements TicketService {
         List<Ticket> ticket = ticketRepository.findByBookedByUserId(getUserThreadId());
 
         return ticket.stream().map(a -> {
-            Show show = showRepository.findById(a.getShowId()).get();
-            MovieElastic movieElastic = movieElasticRepository.findById(show.getMovieId()).get();
-            Theatre theatre = theatreRepository.findById(show.getTheatreId()).get();
-            Screen screen = screenRepository.findById(show.getScreenId()).get();
+            Show show = showRepository.findById(a.getShowId()).orElse(null);
+            if (show == null) return null;
+            MovieElastic movieElastic = movieElasticRepository != null ? movieElasticRepository.findById(show.getMovieId()).orElse(null) : null;
+            Theatre theatre = theatreRepository.findById(show.getTheatreId()).orElse(null);
+            Screen screen = screenRepository.findById(show.getScreenId()).orElse(null);
 
+            if (movieElastic == null || theatre == null || screen == null) return null;
             AllMovieShows allMovieShows = makeAllMovieShows(movieElastic, theatre, screen);
 
             return makeTicketResponse(a, show, allMovieShows);
-        }).toList();
+        }).filter(Objects::nonNull).toList();
 
     }
 

@@ -9,10 +9,12 @@ import com.bookMyShow.bookmyshow.repository.*;
 import com.bookMyShow.bookmyshow.services.MovieService;
 import com.bookMyShow.bookmyshow.services.ShowService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -26,16 +28,17 @@ public class ShowServiceImpl implements ShowService {
     private final ShowRepository showRepository;
     private final SeatRepository seatRepository;
     private final MovieService movieService;
-    private final MovieElasticRepository movieElasticRepository;
+    @Autowired(required = false)
+    private MovieElasticRepository movieElasticRepository;
 
     public Show addShow(ShowDto showDto) {
-        boolean res1 = movieElasticRepository.findById(showDto.getMovieId()).isPresent();
+        boolean res1 = movieElasticRepository != null && movieElasticRepository.findById(showDto.getMovieId()).isPresent();
         boolean res2 = screenRepository.findById(showDto.getScreenId()).isPresent();
         boolean res3 = theatreRepository.findById(showDto.getTheatreId()).isPresent();
 
         Show show = makeShow(showDto);
 
-        if (!(res1 & res2 & res3)) return show;
+        if (!(res1 && res2 && res3)) return show;
 
         int x = 0;
 
@@ -66,12 +69,15 @@ public class ShowServiceImpl implements ShowService {
         List<Show> sh = showRepository.allShows(id);
         return sh.stream().map(a -> {
 
-            MovieElastic movieElastic = movieElasticRepository.findById(a.getMovieId()).get();
-            Theatre theatre = theatreRepository.findById(a.getTheatreId()).get();
-            Screen screen = screenRepository.findById(a.getScreenId()).get();
+            MovieElastic movieElastic = movieElasticRepository != null ? movieElasticRepository.findById(a.getMovieId()).orElse(null) : null;
+            Theatre theatre = theatreRepository.findById(a.getTheatreId()).orElse(null);
+            Screen screen = screenRepository.findById(a.getScreenId()).orElse(null);
 
+            if (movieElastic == null || theatre == null || screen == null) {
+                return null;
+            }
             return makeAllMovieShows(movieElastic, theatre, screen);
-        }).toList();
+        }).filter(Objects::nonNull).toList();
     }
 
 //    @Scheduled(fixedRateString = "PT24H")

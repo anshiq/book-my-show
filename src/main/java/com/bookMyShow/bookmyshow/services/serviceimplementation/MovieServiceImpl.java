@@ -9,6 +9,7 @@ import com.bookMyShow.bookmyshow.repository.MovieElasticRepository;
 import com.bookMyShow.bookmyshow.repository.MovieRepository;
 import com.bookMyShow.bookmyshow.services.MovieService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +27,8 @@ public class MovieServiceImpl implements MovieService {
 
     private final RedisTemplate redisTemplate;
     private final MovieRepository movieRepository;
-    private final MovieElasticRepository movieElasticRepository;
+    @Autowired(required = false)
+    private MovieElasticRepository movieElasticRepository;
 
     public Movie addMovie(MovieDto movieDto) {
         MovieElastic movieElastic = makeMovieElastic(movieDto);
@@ -35,6 +37,9 @@ public class MovieServiceImpl implements MovieService {
     }
 
     public ResponseEntity<?> allMovies() {
+        if (movieElasticRepository == null) {
+            throw new PostExceptions(ErrorResults.MOVIE_NOT_FOUND);
+        }
         List<MovieElastic> movieElastics = new ArrayList<>();
         movieElasticRepository.findAll().forEach(movieElastics::add);
         if (!movieElastics.isEmpty()) return new ResponseEntity<>(movieElastics, HttpStatus.OK);
@@ -42,10 +47,13 @@ public class MovieServiceImpl implements MovieService {
     }
 
     public Optional<MovieElastic> ifMoviePresent(String id) {
+        if (movieElasticRepository == null) {
+            return Optional.empty();
+        }
         return movieElasticRepository.findById(id);
     }
 
-        @Scheduled(fixedDelay = 10000)
+//        @Scheduled(fixedDelay = 10000)
     public void ingestMoviesFromDatabase(){
 //         redis lock -> distributed lock
 //         currTime
@@ -55,6 +63,10 @@ public class MovieServiceImpl implements MovieService {
 //         redis.save(currTime)
 //         unlock
 
+        if (movieElasticRepository == null) {
+            System.out.println("Elasticsearch not available, skipping ingestion");
+            return;
+        }
         movieElasticRepository.deleteAll();
 
         String lastUpdatedTime;
