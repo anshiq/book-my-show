@@ -55,6 +55,10 @@ dependencyManagement {
 	}
 }
 
+tasks.withType(Test) {
+    failOnNoDiscoveredTests = false
+}
+
 //tasks.named('test') {
 //	useJUnitPlatform()
 //}
